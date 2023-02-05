@@ -19,7 +19,7 @@ export class ApiRequest {
                 body: this.parseBody(body)
             });
             const json = await result.json();
-            if(json.reason=='Too Many Requests. Try again later.'){
+            if(json.reason!=undefined){
                 await sleep(2000);
             }
             return json;
