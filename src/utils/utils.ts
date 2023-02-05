@@ -56,7 +56,7 @@ export async function createAstralsToGoalMap(astrals: IAstral[], event: EventEmi
         });
     }
 
-    
+
     //notifies event listener that we finished calling API for every missing astral
     event.emit("finishedCreation");
 }
@@ -94,7 +94,6 @@ export function getAstralType(astral: IAstral): AstralBodies {
 
 export async function validateResponseSync() {
     const answer = await new CurrentMap().validateAnswer();
-
     if (answer == undefined) {
         return undefined;
     }
