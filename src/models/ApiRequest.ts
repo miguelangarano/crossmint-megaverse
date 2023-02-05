@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import { sleep } from "../utils/utils";
 
 export class ApiRequest {
     private baseUrl: string = process.env.API_URL as string;
@@ -18,6 +19,9 @@ export class ApiRequest {
                 body: this.parseBody(body)
             });
             const json = await result.json();
+            if(json.reason=='Too Many Requests. Try again later.'){
+                await sleep(2000);
+            }
             return json;
         }catch(error: any){
             throw new Error(error);

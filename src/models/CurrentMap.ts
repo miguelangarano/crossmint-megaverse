@@ -16,7 +16,9 @@ export class CurrentMap implements IMegaverse {
 
     async validateAnswer(): Promise<boolean>{
         const request = new ApiRequest();
+        console.log("VALIDATEANSWER::", this.candidateId, )
         const response: Record<string, any> = await request.makeRequest(`/map/${this.candidateId}/validate`, ApiRequestMethods.POST);
+        console.log("VALIDATERESPONSE::", this.candidateId, response)
         return response.solved;
     }
 }

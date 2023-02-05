@@ -5,14 +5,10 @@ export class State {
     expectedAstralsNumber: number;
     createdAstralsNumber: number;
     eventEmitter: EventEmitter = new EventEmitter();
-    createdAstrals: Queue<Astral>;
-    erroredAstrals: Queue<Astral>;
 
     constructor(){
         this.expectedAstralsNumber = 0;
         this.createdAstralsNumber = 0;
-        this.createdAstrals = new Queue();
-        this.erroredAstrals = new Queue();
     }
 
     setExpectedAstrals(value: number){
@@ -21,7 +17,6 @@ export class State {
 
     addCreatedAstral(){
         this.createdAstralsNumber += 1;
-        this.eventEmitter.emit('astralAdded');
     }
 
     clearState(){

@@ -14,7 +14,7 @@ export class Astral implements IMegaverse, IAstral {
     color?: AstralColors;
     direction?: AstralDirection;
 
-    constructor(row: number, column: number, type: AstralBodies, color?: AstralColors, direction?: AstralDirection){
+    constructor(row: number, column: number, type: AstralBodies, color: AstralColors | undefined, direction: AstralDirection | undefined){
         this.row = row;
         this.column = column;
         this.type = type;
