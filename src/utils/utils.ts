@@ -1,11 +1,22 @@
 import { AstralBodies, AstralBodiesCurrent, AstralColors, AstralDirection, IAstral } from "../interfaces/IAstral";
+import { Astral } from "../models/Astral";
 import { CurrentMap, CurrentMapMatrix } from "../models/CurrentMap";
 import { GoalMap, GoalMapMatrix } from "../models/GoalMap";
 import { State } from "../models/State";
-import { Astral } from "../models/Astral";
-import { Queue } from "async-await-queue";
 
-const myPriority = -1;
+export async function generateGoalMapSync(state: State, resetFunction: Function) {
+    const goalMap: GoalMap = new GoalMap();
+    const mapMatrix: GoalMapMatrix = await goalMap.getGoalMap();
+    const currentMap: CurrentMap = new CurrentMap();
+    await sleep(1000);
+    const currentMapMatrix: CurrentMapMatrix = await currentMap.getCurrentMap();
+    if (currentMapMatrix == undefined) {
+        resetFunction();
+        return;
+    }
+    const astrals: IAstral[] = getMissingAstralsCoordinates(mapMatrix, currentMapMatrix);
+    createAstralsToGoalMap(astrals, state);
+}
 
 export function getMissingAstralsCoordinates(goalMap: GoalMapMatrix, currentMap: CurrentMapMatrix): IAstral[] {
     const missingAstralsCoordinates: IAstral[] = [];
@@ -19,83 +30,33 @@ export function getMissingAstralsCoordinates(goalMap: GoalMapMatrix, currentMap:
     return missingAstralsCoordinates;
 }
 
-export async function createAstralsToGoalMap(astrals: IAstral[], state: State, myq: Queue) {
+export async function createAstralsToGoalMap(astrals: IAstral[], state: State) {
     for (let astral of astrals) {
         const type = getAstralType(astral);
-        switch (type) {
-            case AstralBodies.POLYANET: {
-                await generateAstralsToGoalMap({
-                    ...astral,
-                    type,
-                }, state, myq);
-            }
-            case AstralBodies.SOLOON: {
-                await generateAstralsToGoalMap({
-                    ...astral,
-                    type,
-                    color: getAstralProperty(astral) as AstralColors
-                }, state, myq);
-            }
-            case AstralBodies.COMETH: {
-                await generateAstralsToGoalMap({
-                    ...astral,
-                    type,
-                    direction: getAstralProperty(astral) as AstralDirection
-                }, state, myq);
-            }
-        }
+        await generateAstralsToGoalMap({
+            ...astral,
+            type,
+            color: getAstralProperty(astral) as AstralColors,
+            direction: getAstralProperty(astral) as AstralDirection
+        });
     }
-    await myq.flush();
+    state.eventEmitter.emit("finishedCreation");
 }
 
-export async function generateAstralsToGoalMap(astral: IAstral, state: State, myq: Queue) {
+export async function generateAstralsToGoalMap(astral: IAstral) {
     const newAstral: Astral = new Astral(astral.row, astral.column, astral.type as AstralBodies, astral.color, astral.direction);
-    await handleAstralCreation(newAstral, state, myq);
-}
-
-export async function handleAstralCreation(astral: Astral, state: State, myq: Queue) {
-
-    const me = Symbol();
-    await myq.wait(me, myPriority);
-
-    console.log(`${astral.type} STARTING at: ${astral.row},${astral.column} ${astral.color} ${astral.direction}`);
     try {
-        const response = await astral.createAstral();
-        console.log("FINALIZED ASTRAL")
-        myq.end(me);
-        state.addCreatedAstral();
-        state.eventEmitter.emit("astralAdded");
-        console.log("ENDED", `${astral.type} at: ${astral.row},${astral.column} ${astral.color} ${astral.direction}`)
-        await myq.flush();
-        console.log(`${astral.type} RESPONSE at: ${astral.row},${astral.column} ${astral.color} ${astral.direction}`, response);
+        const response = await newAstral.createAstral();
+        console.log(`Created ${astral.type} at: ${astral.row},${astral.column} ${astral.color} ${astral.direction}`, response)
     } catch (e) {
         console.log("ERRORED ASTRAL", e)
     }
 }
 
-export async function generateGoalMap(state: State, myq: Queue, restartFunction: Function) {
-    const goalMap: GoalMap = new GoalMap();
-    const mapMatrix: GoalMapMatrix = await goalMap.getGoalMap();
-    const currentMap: CurrentMap = new CurrentMap();
-    const currentMapMatrix: CurrentMapMatrix = await currentMap.getCurrentMap();
-    if (currentMapMatrix == undefined || currentMapMatrix?.content == undefined) {
-        restartFunction();
-        return;
-    }
-    const astrals: IAstral[] = getMissingAstralsCoordinates(mapMatrix, currentMapMatrix);
-    state.setExpectedAstrals(astrals.length);
-    console.log("ASTRALS::", astrals)
-    createAstralsToGoalMap(astrals, state, myq);
-}
-
-export function getRandomNumber() {
-    return Math.floor(Math.random() * (2500 - 1000 + 1) + 1000);
-}
-
-export function getAstralProperty(astral: IAstral): string {
+export function getAstralProperty(astral: IAstral): string | undefined {
     const type = getAstralType(astral);
     if (type == AstralBodies.SPACE || type == AstralBodies.POLYANET) {
-        return "";
+        return undefined;
     }
     return astral.type?.split("_")[0].toLowerCase() ?? "";
 }
@@ -109,6 +70,19 @@ export function getAstralType(astral: IAstral): AstralBodies {
         return AstralBodies.COMETH;
     }
     return AstralBodies.SPACE;
+}
+
+export async function validateResponseSync() {
+    const answer = await new CurrentMap().validateAnswer();
+
+    if (answer == undefined) {
+        return undefined;
+    }
+    if (answer == true) {
+        return true;
+    }
+    return false;
+
 }
 
 
@@ -163,28 +137,11 @@ function handleAstralsDeleteQueueRequests(astral: Astral) {
     }, getRandomNumber());
 }
 
-export async function validateResponse(myq: Queue, state: State, restartFunction: Function) {
-    const me = Symbol();
-    await myq.wait(me, myPriority);
-    const answer = await new CurrentMap().validateAnswer().catch((e) => console.log(e)).finally(() => {
-        myq.end(me);
-        console.log("VALIDATION ENDED")
-    });
-
-    await myq.flush();
-    if (answer == undefined) {
-        state.eventEmitter.emit("validation");
-        return;
-    }
-    if (answer == true) {
-        return;
-    }
-    state.eventEmitter.removeAllListeners();
-    state.clearState();
-    restartFunction();
-
-}
 
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export function getRandomNumber() {
+    return Math.floor(Math.random() * (2500 - 1000 + 1) + 1000);
 }
