@@ -1,22 +1,19 @@
 import { AstralBodies, AstralBodiesCurrent, AstralColors, AstralDirection, IAstral } from "../interfaces/IAstral";
 import { CurrentMap, CurrentMapMatrix } from "../models/CurrentMap";
 import { GoalMap, GoalMapMatrix } from "../models/GoalMap";
-import { State } from "../models/State";
 import { Astral } from "../models/Astral";
 
-export function getMissingAstralsCoordinates(goalMap: GoalMapMatrix, currentMap: CurrentMapMatrix): IAstral[] {
+export function getMissingAstralsCoordinates(goalMap: GoalMapMatrix): IAstral[] {
     const missingAstralsCoordinates: IAstral[] = [];
     goalMap.goal.forEach((rows, i) => {
         rows.forEach((columns, j) => {
-            if (currentMap.content[i][j]?.type == null && columns != AstralBodies.SPACE) {
-                missingAstralsCoordinates.push({ type: columns, row: i, column: j });
-            }
+            missingAstralsCoordinates.push({ type: columns, row: i, column: j });
         })
     });
     return missingAstralsCoordinates;
 }
 
-export function createAstralsToGoalMap(astrals: IAstral[], state: State) {
+export function createAstralsToGoalMap(astrals: IAstral[]) {
     astrals.forEach((astral: IAstral) => {
         const type = getAstralType(astral);
         switch (type) {
@@ -24,61 +21,56 @@ export function createAstralsToGoalMap(astrals: IAstral[], state: State) {
                 generateAstralsToGoalMap({
                     ...astral,
                     type: getAstralType(astral)
-                }, state);
+                });
             }
             case AstralBodies.SOLOON: {
                 generateAstralsToGoalMap({
                     ...astral,
                     type: getAstralType(astral),
                     color: getAstralProperty(astral) as AstralColors
-                }, state);
+                });
             }
             case AstralBodies.COMETH: {
                 generateAstralsToGoalMap({
                     ...astral,
                     type: getAstralType(astral),
                     direction: getAstralProperty(astral) as AstralDirection
-                }, state);
+                },);
             }
         }
     })
 }
 
-export function generateAstralsToGoalMap(astral: IAstral, state: State) {
+export function generateAstralsToGoalMap(astral: IAstral) {
     const newAstral: Astral = new Astral(astral.row, astral.column, astral.type as AstralBodies, astral.color, astral.direction);
-    handleAstralCreation(newAstral, state);
+    handleAstralCreation(newAstral);
 }
 
-function handleAstralCreation(astral: Astral, state: State) {
+function handleAstralCreation(astral: Astral) {
     setTimeout(() => {
         astral.createAstral().then((response) => {
             console.log(`${astral.type} STARTING at: ${astral.row},${astral.column} ${astral.color} ${astral.direction}`, response);
             if (response.reason != undefined && response.reason == "Too Many Requests. Try again later.") {
-                handleAstralCreation(astral, state);
+                handleAstralCreation(astral);
             } else if (response.error == true) {
-                handleAstralCreation(astral, state);
+                handleAstralCreation(astral);
             }
             else {
                 console.log(`${astral.type} CREATED at: ${astral.row},${astral.column} ${astral.color} ${astral.direction}`, response);
-                state.addCreatedAstral();
             }
         }).catch(() => {
-            handleAstralCreation(astral, state);
+            handleAstralCreation(astral);
         })
     }, getRandomNumber());
 }
 
-export async function generateGoalMap(state: State) {
+export async function generateGoalMap() {
     const goalMap: GoalMap = new GoalMap();
     const mapMatrix: GoalMapMatrix = await goalMap.getGoalMap();
     console.log("GOAL MAP::", mapMatrix);
-    const currentMap: CurrentMap = new CurrentMap();
-    const currentMapMatrix: CurrentMapMatrix = await currentMap.getCurrentMap();
-    console.log("CURRENT MAP::", currentMapMatrix);
-    const astrals: IAstral[] = getMissingAstralsCoordinates(mapMatrix, currentMapMatrix);
-    state.setExpectedAstrals(astrals.length);
+    const astrals: IAstral[] = getMissingAstralsCoordinates(mapMatrix);
     console.log("ASTRALS::", astrals)
-    createAstralsToGoalMap(astrals, state);
+    createAstralsToGoalMap(astrals);
 }
 
 export function getRandomNumber() {
@@ -150,4 +142,8 @@ function handleAstralsDeleteQueueRequests(astral: Astral) {
     setTimeout(() => {
         handleAstralDeletion(astral);
     }, getRandomNumber());
+}
+
+export function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
